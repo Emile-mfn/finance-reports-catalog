@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Reports Catalog - Metrofibre</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // ====== CONFIGURATION ======
+        // IMPORTANT: Update these values for your SharePoint site
+        const CONFIG = {
+            siteUrl: 'https://metrofibre365.sharepoint.com/sites/AIBI',
+            listName: 'Finance_Reports_Catalog'
+        };
+        // ===========================
+        
+        // SharePoint REST API Helper
+        const SharePointAPI = {
+            async getListItems() {
+                const endpoint = `${CONFIG.siteUrl}/_api/web/lists/getbytitle('${CONFIG.listName}')/items?$top=5000`;
+                const response = await fetch(endpoint, {
+                    headers: {
+                        'Accept': 'application/json;odata=verbose'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch items');
+                const data = await response.json();
+                
+                // Map SharePoint fields to our format
+                return data.d.results.map(item => ({
+                    id: item.ID,
+                    reportName: item.Report_Name || '',
+                    reportId: item.Report_ID || '',
+                    frequency: item.Frequency || '',
+                    platform: item.Platform || '',
+                    owner: item.Owner || '',
+                    stakeholder: item.Stakeholder || '',
+                    dataSources: item.Data_Sources || '',
+                    queries: item.Queries || '',
+                    dependencies: item.Dependencies || '',
+                    deliveryTime: item.DeliveryTime || '',
+                    purpose: item.Purpose || '',
+                    keyMetrics: item.Key_Metrics || '',
+                    knownIssues: item.Known_Issues || '',
+                    status: item.Status || 'Active',
+                    priority: item.Priority || 'Medium'
+                }));
+            },
+
+            async getFormDigest() {
+                const response = await fetch(`${CONFIG.siteUrl}/_api/contextinfo`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json;odata=verbose'
+                    },
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                return data.d.GetContextWebInformation.FormDigestValue;
+            },
+
+            async createItem(report) {
+                const digest = await this.getFormDigest();
+                const endpoint = `${CONFIG.siteUrl}/_api/web/lists/getbytitle('${CONFIG.listName}')/items`;
+                
+                const itemData = {
+                    __metadata: { type: 'SP.Data.Finance_x0020_Reports_x0020_CatalogListItem' },
+                    Report_Name: report.reportName,
+                    Report_ID: report.reportId,
+                    Frequency: report.frequency,
+                    Platform: report.platform,
+                    Owner: report.owner,
+                    Stakeholder: report.stakeholder,
+                    Data_Sources: report.dataSources,
+                    Queries: report.queries,
+                    Dependencies: report.dependencies,
+                    DeliveryTime: report.deliveryTime,
+                    Purpose: report.purpose,
+                    Key_Metrics: report.keyMetrics,
+                    Known_Issues: report.knownIssues,
+                    Status: report.status,
+                    Priority: report.priority
+                };
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json;odata=verbose',
+                        'Content-Type': 'application/json;odata=verbose',
+                        'X-RequestDigest': digest
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(itemData)
+                });
+
+                if (!response.ok) throw new Error('Failed to create item');
+                const data = await response.json();
+                return data.d.ID;
+            },
+
+            async updateItem(id, report) {
+                const digest = await this.getFormDigest();
+                const endpoint = `${CONFIG.siteUrl}/_api/web/lists/getbytitle('${CONFIG.listName}')/items(${id})`;
+                
+                const itemData = {
+                    __metadata: { type: 'SP.Data.Finance_x0020_Reports_x0020_CatalogListItem' },
+                    Report_Name: report.reportName,
+                    Report_ID: report.reportId,
+                    Frequency: report.frequency,
+                    Platform: report.platform,
+                    Owner: report.owner,
+                    Stakeholder: report.stakeholder,
+                    Data_Sources: report.dataSources,
+                    Queries: report.queries,
+                    Dependencies: report.dependencies,
+                    DeliveryTime: report.deliveryTime,
+                    Purpose: report.purpose,
+                    Key_Metrics: report.keyMetrics,
+                    Known_Issues: report.knownIssues,
+                    Status: report.status,
+                    Priority: report.priority
+                };
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json;odata=verbose',
+                        'Content-Type': 'application/json;odata=verbose',
+                        'X-RequestDigest': digest,
+                        'IF-MATCH': '*',
+                        'X-HTTP-Method': 'MERGE'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(itemData)
+                });
+
+                if (!response.ok) throw new Error('Failed to update item');
+            },
+
+            async deleteItem(id) {
+                const digest = await this.getFormDigest();
+                const endpoint = `${CONFIG.siteUrl}/_api/web/lists/getbytitle('${CONFIG.listName}')/items(${id})`;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json;odata=verbose',
+                        'X-RequestDigest': digest,
+                        'IF-MATCH': '*',
+                        'X-HTTP-Method': 'DELETE'
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete item');
+            }
+        };
+
+        // Lucide icons as inline SVG components
+        const icons = {
+            Search: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+            Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+            Edit2: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+            Trash2: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+            X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Save: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Download: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+            RefreshCw: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+            FileText: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+            AlertCircle: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+            Clock: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            Database: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+            Users: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            ChevronDown: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>,
+            ChevronUp: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>,
+            Filter: () => <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+            Cloud: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        };
+
+        const FinanceReportsCatalog = () => {
+            const [reports, setReports] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [saving, setSaving] = useState(false);
+            const [error, setError] = useState(null);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterPlatform, setFilterPlatform] = useState('all');
+            const [filterFrequency, setFilterFrequency] = useState('all');
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [editingReport, setEditingReport] = useState(null);
+            const [expandedCard, setExpandedCard] = useState(null);
+            
+            const [formData, setFormData] = useState({
+                reportName: '', reportId: '', frequency: '', platform: '', owner: '',
+                stakeholder: '', dataSources: '', queries: '', dependencies: '',
+                deliveryTime: '', purpose: '', keyMetrics: '', knownIssues: '',
+                status: 'Active', priority: 'Medium'
+            });
+
+            const frequencies = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Ad-hoc', 'Annual'];
+            const platforms = ['Power BI', 'SQL Server', 'Excel', 'Tableau', 'Python/Jupyter', 'Custom App', 'Other'];
+            const statuses = ['Active', 'Under Review', 'Deprecated', 'Planned'];
+            const priorities = ['Critical', 'High', 'Medium', 'Low'];
+
+            useEffect(() => {
+                loadReports();
+            }, []);
+
+            const loadReports = async () => {
+                setLoading(true);
+                setError(null);
+                try {
+                    const items = await SharePointAPI.getListItems();
+                    setReports(items);
+                } catch (err) {
+                    setError('Failed to load reports from SharePoint. Please check your configuration and permissions.');
+                    console.error('Error loading reports:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const resetForm = () => {
+                setFormData({
+                    reportName: '', reportId: '', frequency: '', platform: '', owner: '',
+                    stakeholder: '', dataSources: '', queries: '', dependencies: '',
+                    deliveryTime: '', purpose: '', keyMetrics: '', knownIssues: '',
+                    status: 'Active', priority: 'Medium'
+                });
+            };
+
+            const handleSave = async () => {
+                if (!formData.reportName || !formData.frequency || !formData.platform) {
+                    alert('Please fill in Report Name, Frequency, and Platform');
+                    return;
+                }
+
+                setSaving(true);
+                setError(null);
+                try {
+                    if (editingReport) {
+                        await SharePointAPI.updateItem(editingReport.id, formData);
+                    } else {
+                        await SharePointAPI.createItem(formData);
+                    }
+                    await loadReports();
+                    setShowAddModal(false);
+                    setEditingReport(null);
+                    resetForm();
+                } catch (err) {
+                    setError('Failed to save report. Please try again.');
+                    console.error('Error saving report:', err);
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            const handleEdit = (report) => {
+                setFormData(report);
+                setEditingReport(report);
+                setShowAddModal(true);
+            };
+
+            const handleDelete = async (id) => {
+                if (!confirm('Are you sure you want to delete this report?')) return;
+
+                setSaving(true);
+                setError(null);
+                try {
+                    await SharePointAPI.deleteItem(id);
+                    await loadReports();
+                } catch (err) {
+                    setError('Failed to delete report. Please try again.');
+                    console.error('Error deleting report:', err);
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            const exportToCSV = () => {
+                const headers = ['Report ID', 'Report Name', 'Frequency', 'Platform', 'Owner', 'Stakeholder', 'Delivery Time', 'Purpose', 'Status', 'Priority'];
+                const rows = reports.map(r => [r.reportId, r.reportName, r.frequency, r.platform, r.owner, r.stakeholder, r.deliveryTime, r.purpose, r.status, r.priority]);
+                const csv = [headers, ...rows].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'finance_reports_catalog.csv';
+                a.click();
+            };
+
+            const filtered = reports.filter(r => {
+                const search = r.reportName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              r.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              r.reportId.toLowerCase().includes(searchTerm.toLowerCase());
+                return search && 
+                       (filterPlatform === 'all' || r.platform === filterPlatform) &&
+                       (filterFrequency === 'all' || r.frequency === filterFrequency) &&
+                       (filterStatus === 'all' || r.status === filterStatus);
+            });
+
+            const getPriorityColor = (p) => ({
+                'Critical': 'bg-red-100 text-red-800 border-red-300',
+                'High': 'bg-orange-100 text-orange-800 border-orange-300',
+                'Medium': 'bg-blue-100 text-blue-800 border-blue-300',
+                'Low': 'bg-gray-100 text-gray-800 border-gray-300'
+            }[p] || 'bg-gray-100 text-gray-800 border-gray-300');
+
+            const getStatusColor = (s) => ({
+                'Active': 'bg-green-100 text-green-800',
+                'Under Review': 'bg-yellow-100 text-yellow-800',
+                'Deprecated': 'bg-red-100 text-red-800',
+                'Planned': 'bg-purple-100 text-purple-800'
+            }[s] || 'bg-gray-100 text-gray-800');
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading catalog from SharePoint...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+                    <div className="bg-white shadow-lg border-b-4 border-blue-600">
+                        <div className="max-w-7xl mx-auto px-6 py-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                                        Finance Reports Catalog
+                                    </h1>
+                                    <p className="text-gray-600 mt-2 flex items-center gap-2">
+                                        {icons.FileText()} BI & AI Team - Metrofibre
+                                        <span className="ml-2 flex items-center gap-1 text-green-600 text-sm">
+                                            {icons.Cloud()} SharePoint Connected
+                                        </span>
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-3xl font-bold text-blue-600">{reports.length}</div>
+                                    <div className="text-sm text-gray-500">Total Reports</div>
+                                </div>
+                            </div>
+                            
+                            {error && (
+                                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 rounded">
+                                    <div className="flex items-start gap-2">
+                                        {icons.AlertCircle()}
+                                        <div>
+                                            <p className="text-red-800 font-semibold">Error</p>
+                                            <p className="text-red-700 text-sm">{error}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3 flex-wrap">
+                                <button onClick={() => setShowAddModal(true)} disabled={saving}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition shadow-md disabled:opacity-50">
+                                    {icons.Plus()} Add Report
+                                </button>
+                                <button onClick={loadReports} disabled={saving}
+                                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition shadow-md disabled:opacity-50">
+                                    {icons.RefreshCw()} Refresh
+                                </button>
+                                <button onClick={exportToCSV}
+                                    className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition shadow-md">
+                                    {icons.Download()} Export CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-7xl mx-auto px-6 py-6">
+                        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="relative">
+                                    <div className="absolute left-3 top-3 text-gray-400">{icons.Search()}</div>
+                                    <input type="text" placeholder="Search reports..." value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                                </div>
+                                <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}
+                                    className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">All Platforms</option>
+                                    {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <select value={filterFrequency} onChange={(e) => setFilterFrequency(e.target.value)}
+                                    className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">All Frequencies</option>
+                                    {frequencies.map(f => <option key={f} value={f}>{f}</option>)}
+                                </select>
+                                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">All Statuses</option>
+                                    {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {filtered.length > 0 ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {filtered.map(report => (
+                                    <div key={report.id} className={`bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border-l-4 ${getPriorityColor(report.priority).split(' ')[0]}`}>
+                                        <div className="p-6">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        {report.reportId && <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-1 rounded">{report.reportId}</span>}
+                                                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(report.status)}`}>{report.status}</span>
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-gray-800 mb-2">{report.reportName}</h3>
+                                                    <div className="flex gap-2 flex-wrap">
+                                                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                                                            {icons.Clock()} {report.frequency}
+                                                        </span>
+                                                        <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                                                            {icons.Database()} {report.platform}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleEdit(report)} disabled={saving}
+                                                        className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition disabled:opacity-50">{icons.Edit2()}</button>
+                                                    <button onClick={() => handleDelete(report.id)} disabled={saving}
+                                                        className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition disabled:opacity-50">{icons.Trash2()}</button>
+                                                </div>
+                                            </div>
+                                            {report.purpose && <p className="text-gray-600 mb-3 text-sm">{report.purpose}</p>}
+                                            <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                                                {report.owner && <div className="flex items-center gap-2">{icons.Users()} <span className="text-gray-700">Owner: {report.owner}</span></div>}
+                                                {report.deliveryTime && <div className="flex items-center gap-2">{icons.Clock()} <span className="text-gray-700">{report.deliveryTime}</span></div>}
+                                            </div>
+                                            {report.knownIssues && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-3 rounded">
+                                                    <div className="flex items-start gap-2">
+                                                        {icons.AlertCircle()}
+                                                        <div>
+                                                            <span className="font-semibold text-yellow-800 text-sm">Known Issues:</span>
+                                                            <p className="text-yellow-700 text-sm mt-1">{report.knownIssues}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button onClick={() => setExpandedCard(expandedCard === report.id ? null : report.id)}
+                                                className="w-full mt-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center justify-center gap-2 text-gray-700 font-medium transition">
+                                                {expandedCard === report.id ? <>{`Show Less `}{icons.ChevronUp()}</> : <>{`View Details `}{icons.ChevronDown()}</>}
+                                            </button>
+                                            {expandedCard === report.id && (
+                                                <div className="mt-4 pt-4 border-t border-gray-200 space-y-3 text-sm">
+                                                    {report.stakeholder && <div><span className="font-semibold text-gray-700">Stakeholder:</span><p className="text-gray-600 mt-1">{report.stakeholder}</p></div>}
+                                                    {report.dataSources && <div><span className="font-semibold text-gray-700">Data Sources:</span><p className="text-gray-600 mt-1 whitespace-pre-line">{report.dataSources}</p></div>}
+                                                    {report.dependencies && <div><span className="font-semibold text-gray-700">Dependencies:</span><p className="text-gray-600 mt-1 whitespace-pre-line">{report.dependencies}</p></div>}
+                                                    {report.queries && <div><span className="font-semibold text-gray-700">Queries/Logic:</span><pre className="text-gray-600 mt-1 bg-gray-50 p-3 rounded text-xs overflow-x-auto">{report.queries}</pre></div>}
+                                                    {report.keyMetrics && <div><span className="font-semibold text-gray-700">Key Metrics:</span><p className="text-gray-600 mt-1 whitespace-pre-line">{report.keyMetrics}</p></div>}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                                {icons.Filter()}
+                                <h3 className="text-xl font-semibold text-gray-600 mb-2 mt-4">
+                                    {searchTerm || filterPlatform !== 'all' || filterFrequency !== 'all' || filterStatus !== 'all' ? 'No reports match your filters' : 'No reports in catalog yet'}
+                                </h3>
+                                <p className="text-gray-500">
+                                    {searchTerm || filterPlatform !== 'all' || filterFrequency !== 'all' || filterStatus !== 'all' ? 'Try adjusting your search or filters' : 'Click "Add Report" to start building your catalog'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8">
+                                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-xl">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-white">{editingReport ? 'Edit Report' : 'Add New Report'}</h2>
+                                        <button onClick={() => { setShowAddModal(false); setEditingReport(null); resetForm(); }} disabled={saving}
+                                            className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition disabled:opacity-50">{icons.X()}</button>
+                                    </div>
+                                </div>
+                                <div className="p-6 max-h-[70vh] overflow-y-auto">
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Report Name *</label>
+                                                <input type="text" value={formData.reportName} onChange={(e) => setFormData({...formData, reportName: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="e.g., Monthly Revenue Summary" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Report ID</label>
+                                                <input type="text" value={formData.reportId} onChange={(e) => setFormData({...formData, reportId: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="e.g., FIN-001" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Frequency *</label>
+                                                <select value={formData.frequency} onChange={(e) => setFormData({...formData, frequency: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                    <option value="">Select frequency</option>
+                                                    {frequencies.map(f => <option key={f} value={f}>{f}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Platform/System *</label>
+                                                <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                    <option value="">Select platform</option>
+                                                    {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Report Owner</label>
+                                                <input type="text" value={formData.owner} onChange={(e) => setFormData({...formData, owner: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="BI Team member" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Finance Stakeholder</label>
+                                                <input type="text" value={formData.stakeholder} onChange={(e) => setFormData({...formData, stakeholder: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="CFO, Finance Manager" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                                                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                    {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Priority Level</label>
+                                                <select value={formData.priority} onChange={(e) => setFormData({...formData, priority: e.target.value})}
+                                                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                    {priorities.map(p => <option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Delivery Time/SLA</label>
+                                            <input type="text" value={formData.deliveryTime} onChange={(e) => setFormData({...formData, deliveryTime: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., Daily by 9 AM SAST" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Business Purpose</label>
+                                            <textarea value={formData.purpose} onChange={(e) => setFormData({...formData, purpose: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="2" placeholder="What this report is used for, decisions it supports..." />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Data Sources</label>
+                                            <textarea value={formData.dataSources} onChange={(e) => setFormData({...formData, dataSources: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="2" placeholder="List all source systems/databases" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Dependencies</label>
+                                            <textarea value={formData.dependencies} onChange={(e) => setFormData({...formData, dependencies: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="2" placeholder="Other reports, ETL jobs, or systems this depends on" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Queries/Logic Used</label>
+                                            <textarea value={formData.queries} onChange={(e) => setFormData({...formData, queries: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                                rows="3" placeholder="Key SQL queries, DAX measures, calculations..." />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Key Metrics</label>
+                                            <textarea value={formData.keyMetrics} onChange={(e) => setFormData({...formData, keyMetrics: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="2" placeholder="Main KPIs/metrics included in this report" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Known Issues</label>
+                                            <textarea value={formData.knownIssues} onChange={(e) => setFormData({...formData, knownIssues: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="2" placeholder="Current bugs, limitations, or concerns" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 p-6 rounded-b-xl flex gap-3 justify-end">
+                                    <button onClick={() => { setShowAddModal(false); setEditingReport(null); resetForm(); }} disabled={saving}
+                                        className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-300 transition disabled:opacity-50">
+                                        {icons.X()} Cancel
+                                    </button>
+                                    <button onClick={handleSave} disabled={saving}
+                                        className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition shadow-md disabled:opacity-50">
+                                        {saving ? 'Saving...' : <>{icons.Save()} {editingReport ? 'Update' : 'Save'} Report</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<FinanceReportsCatalog />, document.getElementById('root'));
+    </script>
+</body>
+</html>
